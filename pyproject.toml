@@ -18,21 +18,21 @@ description = "Tools to convert IBL data to NWB format.."
 readme = "README.md"
 keywords = ["nwb", "dandi", "ibl"]
 license = {file = "license.txt"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
-    "dandi",
-    "neuroconv",
-    "spikeinterface",
-    "probeinterface",
-    "ndx-pose==0.1.1",
-    "ndx-ibl==0.1.0",
     "ONE-api",
-    "ibllib",
+    "dandi",
     "iblatlas",
+    "ibllib",
+    "ipython",
+    "ndx-ibl==0.1.0",
+    "ndx-pose==0.1.1",
+    "neuroconv",
+    "probeinterface",
+    "spikeinterface",
 ]
 classifiers = [
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -42,8 +42,6 @@ classifiers = [
     "Operating System :: MacOS",
     "License :: OSI Approved :: BSD License",
 ]
-
-
 
 [tool.black]
 line-length = 120
@@ -65,8 +63,6 @@ extend-exclude = '''
   | dist
 )/
 '''
-
-
 
 [tool.ruff]
 exclude = [
