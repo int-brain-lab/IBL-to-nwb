@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from one.alf.path import remove_uuid_string
 
 
 def create_symlinks(source_dir, target_dir, remove_uuid=True, filter=None):
@@ -16,9 +17,6 @@ def create_symlinks(source_dir, target_dir, remove_uuid=True, filter=None):
             target_file_path.parent.mkdir(parents=True, exist_ok=True)
 
             if remove_uuid:
-                parent, name = target_file_path.parent, target_file_path.name
-                name_parts = name.split(".")
-                name_parts.remove(name_parts[-2])
-                target_file_path = parent / ".".join(name_parts)
+                target_file_path = remove_uuid_string(target_file_path)
             if not target_file_path.exists():
                 target_file_path.symlink_to(source_file_path)
