@@ -7,14 +7,6 @@ import spikeglx
 
 from ibl_to_nwb.helpers import create_symlinks
 
-# if running on SDSC, use the OneSdsc, else normal
-if "USE_SDSC_ONE" in os.environ:
-    print("using SDSC ONE")
-    from deploy.iblsdsc import OneSdsc as ONE
-else:
-    print("using regular ONE")
-    from one.api import ONE
-
 from ibl_to_nwb.converters import BrainwideMapConverter, IblSpikeGlxConverter
 from ibl_to_nwb.datainterfaces import (
     BrainwideMapTrialsInterface,
@@ -26,9 +18,6 @@ from ibl_to_nwb.datainterfaces import (
     RoiMotionEnergyInterface,
     WheelInterface,
 )
-
-revision = '2025-05-06'
-output_folder = Path.home() / "ibl_scratch" / "nwbfiles"
 
 
 def _get_processed_data_interfaces(one, eid, revision=None):
@@ -109,78 +98,39 @@ def _get_raw_data_interfaces(one, eid, session_folder=None) -> List:
     return data_interfaces
 
 
-def convert(eid: str, one: ONE, data_interfaces: list, revision: str, mode: str):
-    # Run conversion
-    session_converter = BrainwideMapConverter(one=one, session=eid, data_interfaces=data_interfaces, verbose=True)
-    metadata = session_converter.get_metadata()
-    metadata["NWBFile"]["session_id"] = f"{eid}:{revision}"  # FIXME this hack has to go
-    subject_id = metadata["Subject"]["subject_id"]
+def convert_session(eid=None, one=None, revision=None, cleanup=True):
 
-    subject_folder_path = output_folder / f"sub-{subject_id}"
-    subject_folder_path.mkdir(exist_ok=True)
-    if mode == "raw":
-        fname = f"sub-{subject_id}_ses-{eid}_desc-raw_ecephys+image.nwb"
-    if mode == "processed":
-        fname = f"sub-{subject_id}_ses-{eid}_desc-processed_behavior+ecephys.nwb"
-
-    nwbfile_path = subject_folder_path / fname
-    session_converter.run_conversion(
-        nwbfile_path=nwbfile_path,
-        metadata=metadata,
-        overwrite=True,
-    )
-
-    return nwbfile_path
-
-
-cleanup = False
-
-def convert_session(eid=None, revision=None):
-
+    assert one is not None
     # path setup
     base_path = Path.home() / "ibl_scratch"
     output_folder = base_path / "nwbfiles"
     output_folder.mkdir(exist_ok=True, parents=True)
     session_scratch_folder = base_path / eid
-
-    # common
-    one_kwargs = dict(
-        base_url="https://openalyx.internationalbrainlab.org",
-        password="international",
-        mode="remote",
-    )
-
-    # if not running on SDSC adding the cache folder explicitly
-    if "USE_SDSC_ONE" in os.environ:
-        one_kwargs["cache_rest"] = None  # disables rest caching (write permission errors on popeye)
-    else:
-        # Initialize IBL (ONE) client to download processed data for this session
-        one_cache_folder_path = base_path / "ibl_conversion" / eid / "cache"
-        one_kwargs["cache_dir"] = one_cache_folder_path
-
-    # instantiate one
-    one = ONE(**one_kwargs)
     session_folder = one.eid2path(eid)
-    # convert the raw NWB file
+
+    # creates the raw NWB file
     create_symlinks(session_folder, session_scratch_folder)
-    file_nwb_raw = convert(
-        eid=eid,
-        one=one,
-        data_interfaces=_get_raw_data_interfaces(one, eid, session_folder=session_folder),
-        revision=revision,
-        mode='raw',
+    session_converter = BrainwideMapConverter(one=one, session=eid, data_interfaces=_get_raw_data_interfaces(one, eid, session_folder=session_folder), verbose=True)
+    metadata = session_converter.get_metadata()
+    metadata["NWBFile"]["session_id"] = f"{eid}:{revision}"  # FIXME this hack has to go
+    subject_id = metadata["Subject"]["subject_id"]
+    session_converter.run_conversion(
+        nwbfile_path=output_folder.joinpath(f"sub-{subject_id}", f"sub-{subject_id}_ses-{eid}_desc-raw_ecephys+image.nwb"),
+        metadata=metadata,
+        overwrite=True,
     )
     if cleanup:
         # find . -type l -exec unlink {} \;")
         os.system(f"find {session_scratch_folder} -type l -exec unlink {{}} \;")
         shutil.rmtree(session_scratch_folder)
 
-    # convert the processed NWB file
-    file_nwb_processed = convert(
-        eid=eid,
-        one=one,
-        data_interfaces=_get_processed_data_interfaces(one, eid, revision),
-        revision=revision,
-        mode='processed',
+    # creates the processed NWB file
+    session_converter = BrainwideMapConverter(one=one, session=eid, data_interfaces=_get_processed_data_interfaces(one, eid, revision=session_folder), verbose=True)
+    metadata = session_converter.get_metadata()
+    metadata["NWBFile"]["session_id"] = f"{eid}:{revision}"  # FIXME this hack has to go
+    session_converter.run_conversion(
+        nwbfile_path=f"sub-{subject_id}_ses-{eid}_desc-processed_behavior+ecephys.nwb",
+        metadata=metadata,
+        overwrite=True,
     )
 
