@@ -26,7 +26,6 @@ with NWBHDF5IO(path=nwbfile_path, mode="r") as io:
     nwbfile = io.read()
     eid = nwbfile.session_id
 
-
 # %%
 # path setup
 base_path = Path.home() / "ibl_scratch"

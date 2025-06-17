@@ -1,7 +1,6 @@
 # %% imports
 import sys
 from pathlib import Path
-
 from one.api import ONE
 
 # %% session selection
@@ -36,7 +35,7 @@ collections = one.list_collections(eid)
 
 # %% download everything
 for dataset in datasets:
-    one.load_dataset(eid, dataset, download_only=True)
+    one.load_dataset(eid, dataset)
 
 # %% downloads just raw ephys data
 # collections = one.list_collections(eid, collection="raw_ephys_data/*")
