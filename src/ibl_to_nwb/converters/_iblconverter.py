@@ -4,14 +4,15 @@ from datetime import datetime
 from typing import Literal, Optional
 
 from dateutil import tz
-from ndx_ibl import IblSubject
-from ndx_ibl_bwm import ibl_bwm_metadata
+from ndx_ibl import IblMetadata, IblSubject
 from neuroconv import ConverterPipe
 from neuroconv.tools.nwb_helpers import HDF5BackendConfiguration, configure_backend, make_or_load_nwbfile
 from one.api import ONE
 from pydantic import FilePath
 from pynwb import NWBFile
 from typing_extensions import Self
+
+from ..utils import get_ibl_subject_metadata
 
 
 class IblConverter(ConverterPipe):
@@ -44,30 +45,11 @@ class IblConverter(ConverterPipe):
         metadata["NWBFile"]["protocol"] = session_metadata["task_protocol"]
         # Setting publication and experiment description at project-specific converter level
 
-        subject_metadata_list = self.one.alyx.rest("subjects", "list", nickname=session_metadata["subject"])
-        assert len(subject_metadata_list) == 1, "More than one subject metadata returned by query."
-        subject_metadata = subject_metadata_list[0]
-
-        subject_extra_metadata_name_mapping = dict(
-            last_water_restriction="last_water_restriction",  # ISO
-            remaining_water="remaining_water_ml",
-            expected_water="expected_water_ml",
-            url="url",
+        # Get subject metadata using centralized utility function
+        subject_metadata_block = get_ibl_subject_metadata(
+            one=self.one, session_metadata=session_metadata, tzinfo=tzinfo
         )
-        for ibl_key, nwb_name in subject_extra_metadata_name_mapping.items():
-            if ibl_key not in subject_metadata:
-                continue
-            metadata["Subject"].update({nwb_name: subject_metadata[ibl_key]})
-
-        # Subject description set at project-specific converter level
-        metadata["Subject"]["subject_id"] = subject_metadata["nickname"]
-        metadata["Subject"]["sex"] = subject_metadata["sex"]
-        metadata["Subject"]["species"] = "Mus musculus"  # Though it's a field in their schema, it's never specified
-        metadata["Subject"]["weight"] = subject_metadata["reference_weight"] * 1e-3  # Convert from grams to kilograms
-        date_of_birth = datetime.strptime(subject_metadata["birth_date"], "%Y-%m-%d")
-        date_of_birth = date_of_birth.replace(tzinfo=tzinfo)
-        metadata["Subject"]["date_of_birth"] = date_of_birth
-        # There's also 'age_weeks' but I'm excluding that based on existence of DOB
+        metadata["Subject"].update(subject_metadata_block)
 
         return metadata
 
@@ -131,7 +113,7 @@ class IblConverter(ConverterPipe):
             nwbfile_out.subject = ibl_subject
 
             # adding ibl specific metadata
-            nwbfile_out.add_lab_meta_data(lab_meta_data=ibl_bwm_metadata(**ibl_metadata))
+            nwbfile_out.add_lab_meta_data(lab_meta_data=IblMetadata(**ibl_metadata))
 
             for interface_name, data_interface in self.data_interface_objects.items():
                 conversion_options = conversion_options.get(interface_name, dict())
